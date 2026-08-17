@@ -7,14 +7,14 @@ from sklearn.metrics import (
     RocCurveDisplay,
     precision_score,
     recall_score,
-    f1_score
+    f1_score,
+    silhouette_score,
 )
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# from preprocessing import *
 
 def check_classifier_fit(modelf, Xf_train, yf_train, Xf_evaluation, yf_evaluation, model_namef="Model", gap_thresholdf=0.05, low_score_thresholdf=0.70
 ):
@@ -218,3 +218,12 @@ def plot_gridsearch_results(grid_search, parameter, title, x_label, score_label=
     plt.show()
 
     return plot_data
+
+def gmm_silhouette_scorer(estimator, X, y=None):
+
+    labels = estimator.predict(X)
+
+    if len(np.unique(labels)) < 2:
+        return -1
+
+    return silhouette_score(X, labels)
