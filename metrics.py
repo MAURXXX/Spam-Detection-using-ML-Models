@@ -16,57 +16,40 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-def check_classifier_fit(modelf, Xf_train, yf_train, Xf_evaluation, yf_evaluation, model_namef="Model", gap_thresholdf=0.05, low_score_thresholdf=0.70
-):
-    """
-    Checks for possible overfitting or underfitting.
-
-    Parameters
-    ----------
-    model:
-        Already-fitted sklearn model or pipeline.
-
-    X_train, y_train:
-        Training data used by the fitted model.
-
-    X_evaluation, y_evaluation:
-        Validation or test data.
-
-    gap_threshold:
-        Maximum acceptable difference between training
-        and evaluation F1-scores.
-
-    low_score_threshold:
-        Scores below this value may indicate underfitting.
-    """
+def check_classifier_fit(modelf, Xf_train, yf_train, Xf_evaluation, yf_evaluation, model_namef="Model", gap_thresholdf=0.05,
+                        low_score_thresholdf=0.70, neural_network=False):
 
     train_predictions = modelf.predict(Xf_train)
     evaluation_predictions = modelf.predict(Xf_evaluation)
 
+    # Keras models return probabilities,
+    # so convert them to binary class predictions
+    if neural_network:
+        train_predictions = (train_predictions.flatten() >= 0.5).astype(int)
+        evaluation_predictions = (evaluation_predictions.flatten() >= 0.5).astype(int)
+
     train_accuracy = accuracy_score(yf_train, train_predictions)
     evaluation_accuracy = accuracy_score(yf_evaluation, evaluation_predictions)
+
     train_precision = precision_score(yf_train, train_predictions, zero_division=0)
     evaluation_precision = precision_score(yf_evaluation, evaluation_predictions, zero_division=0)
+
     train_recall = recall_score(yf_train, train_predictions, zero_division=0)
     evaluation_recall = recall_score(yf_evaluation, evaluation_predictions, zero_division=0)
-    train_f1 = f1_score(yf_train, train_predictions, zero_division=0)
-    evaluation_f1 = f1_score(yf_evaluation, evaluation_predictions, zero_division=0)
+
+    train_f1 = f1_score(yf_train,train_predictions,zero_division=0)
+    evaluation_f1 = f1_score(yf_evaluation,evaluation_predictions,zero_division=0)
+
     f1_gap = train_f1 - evaluation_f1
 
-    if (
-        train_f1 < low_score_thresholdf
-        and evaluation_f1 < low_score_thresholdf
-    ):
+    if (train_f1 < low_score_thresholdf and evaluation_f1 < low_score_thresholdf):
         diagnosis = "Possible underfitting"
 
     elif f1_gap > gap_thresholdf:
         diagnosis = "Possible overfitting"
 
     elif evaluation_f1 > train_f1 + gap_thresholdf:
-        diagnosis = (
-            "Evaluation score unexpectedly exceeds training score; "
-            "check preprocessing or data leakage"
-        )
+        diagnosis = ("Evaluation score unexpectedly exceeds training score; check preprocessing or data leakage")
 
     else:
         diagnosis = "Good generalisation"
@@ -227,3 +210,32 @@ def gmm_silhouette_scorer(estimator, X, y=None):
         return -1
 
     return silhouette_score(X, labels)
+
+def dbscan_scorer(estimator, X, y=None):
+
+        labels = estimator.fit_predict(X)
+
+        non_noise = labels != -1
+        clusters = np.unique(labels[non_noise])
+
+        # Invalid clustering
+        if len(clusters) < 2:
+            return -1
+
+        if non_noise.sum() <= len(clusters):
+            return -1
+
+        silhouette = silhouette_score(
+            X[non_noise],
+            labels[non_noise]
+        )
+
+        coverage = np.mean(non_noise)
+
+        # Penalise solutions that classify
+        # most samples as noise
+        score = silhouette * coverage
+
+        return score
+
+
